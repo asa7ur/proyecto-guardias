@@ -216,28 +216,48 @@ async function fetchMoteros() {
   const startTime = performance.now();
 
   try {
+    // 1. Hacemos la petición al puerto 3001
     const res = await fetch(`http://localhost:3001/api/panel?diaSemana=${diaStr}&fecha=${fechaStr}`);
+    if (!res.ok) throw new Error("Error en la respuesta del servidor");
+    
     const data = await res.json();
     const endTime = performance.now();
     latencyBox.innerText = `Fetch: ${(endTime - startTime).toFixed(0)} ms`;
     latencyBox.style.display = "inline-block";
 
-    const formateados = data.ausencias.map((ausencia) => {
-      const guardiasEnEsaHora = data.guardias
-        .filter((g) => g.hora === ausencia.hora && g.status === "disponible")
-        .map((g) => `${g.profesor.nombre} ${g.profesor.apellidos}`);
+    let formateados = [];
 
-      return {
-        hora: ausencia.hora,
-        responsable: guardiasEnEsaHora.length > 0 ? guardiasEnEsaHora.join(", ") : null,
+    // 2. Mapeamos las ausencias de Los Moteros
+    data.ausencias.forEach((ausencia) => {
+      // Normalizamos el formato de hora: "1º" -> "1ª Hora"
+      const horaVisual = ausencia.hora.replace('º', 'ª') + " Hora";
+      formateados.push({
+        hora: horaVisual,
+        responsable: null,
         sujeto: `${ausencia.profesor.nombre} ${ausencia.profesor.apellidos}`,
         lugar: ausencia.grupo,
         nota: ausencia.tarea,
-      };
+      });
     });
+
+    // 3. Mapeamos las guardias (profesores disponibles)
+    data.guardias.forEach((g) => {
+      if (g.status === "disponible") {
+        const horaVisual = g.hora.replace('º', 'ª') + " Hora";
+        formateados.push({
+          hora: horaVisual,
+          responsable: `${g.profesor.nombre} ${g.profesor.apellidos}`,
+          sujeto: null,
+          lugar: null
+        });
+      }
+    });
+
+    // 4. Renderizamos la tabla con todos los datos combinados
     renderizarTablaExterna(formateados);
   } catch (e) {
-    alert("Error conectando con el servidor de Moteros (Puerto 3001)");
+    console.error(e);
+    alert("Error conectando con el servidor de Moteros (Puerto 3001). Asegúrate de que el servidor esté encendido y MongoDB conectado.");
   }
 }
 
